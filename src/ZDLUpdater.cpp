@@ -45,14 +45,6 @@ ZDLUpdater::~ZDLUpdater(){
     delete http;
 }
 
-void ZDLUpdater::setHost(const char* host, const int port){
-	LOGDATAO() << "setHost " << host << port << endl;
-    this->host = host;
-    this->port = port;
-    url.setHost(QString("http://%1:%2/").arg(host, QString().setNum(port)));
-    http->setUrl(url);
-}
-
 int ZDLUpdater::hasError(){
 	return errorCode;
 }
@@ -143,7 +135,7 @@ void ZDLUpdater::fetch(int doAnyways){
 		}
 	}
 
-    if (reply == NULL || !reply->isRunning()) {
+    if (reply == nullptr) {
 		buffer.clear();
 		updateCode = 0;
         url.setHost(host, QUrl::StrictMode);
@@ -309,8 +301,10 @@ void ZDLUpdater::httpRequestFinished(){
 		return;
 	}
     */
-    if (reply->error()){
+    errorCode = reply->error();
+    if (errorCode != QNetworkReply::NoError) {
         LOGDATAO() << "Error! Buffer was: " << buffer << endl;
+        reply->abort();
 		return;
 	}
 	ZDLConf *zconf = ZDLConfigurationManager::getActiveConfiguration();
@@ -367,7 +361,10 @@ void ZDLUpdater::readyRead () {
     errorCode = reply->error();
     if (errorCode == QNetworkReply::NoError) {
         buffer.append(reply->readAll());
+        reply->close();
     } else {
+		reply->abort();
         ZDLConfigurationManager::setInfobarMessage("There was an unexpected HTTP response code checking for updates",1);
     }
+    delete reply;
 }

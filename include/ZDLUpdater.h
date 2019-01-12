@@ -35,7 +35,6 @@ Q_OBJECT
 	public:
 		ZDLUpdater();
 		~ZDLUpdater();
-	void setHost(const char* host, const int port);
 	void fetch();
 	int hasUpdate();
 	int hasError();
