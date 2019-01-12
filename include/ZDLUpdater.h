@@ -51,6 +51,8 @@ Q_OBJECT
 		QByteArray buffer;
         QNetworkAccessManager net;
         QNetworkReply* reply;
+
+        QString getUserAgent();
 	protected slots:
         // TODO: Replace QHttp stuff
         void httpRequestFinished();

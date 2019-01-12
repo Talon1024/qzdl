@@ -135,162 +135,165 @@ void ZDLUpdater::fetch(int doAnyways){
 		}
 	}
 
+	buffer.clear();
+	updateCode = 0;
+	url.setHost(host, QUrl::StrictMode);
+	url.setPort(port);
+
+	QString upath("/check.php");
+	QString uquery("name=%1&id=%2");
+	uquery.arg(ZDL_PRODUCT_ID, QString().setNum(ZDL_VERSION_ID));
+	url.setPath(upath, QUrl::StrictMode);
+	url.setQuery(uquery, QUrl::StrictMode);
+
+	QString ua = getUserAgent();
+	LOGDATAO() << "User-Agent: " << ua << endl;
+
     if (reply == nullptr) {
-		buffer.clear();
-		updateCode = 0;
-        url.setHost(host, QUrl::StrictMode);
-        url.setPort(port);
-
-        QString upath("/check.php");
-        QString uquery("name=%1&id=%2");
-        uquery.arg(ZDL_PRODUCT_ID, QString().setNum(ZDL_VERSION_ID));
-        url.setPath(upath, QUrl::StrictMode);
-        url.setQuery(uquery, QUrl::StrictMode);
-
-        // Construct UA string
-		QString ua = QString(ZDL_ENGINE_NAME) + QString(" ") + versionString;
-		ua += " (";
-#ifdef Q_WS_WIN
-		if (QSysInfo::WindowsVersion & QSysInfo::WV_DOS_based){
-			ua += "Win32; ";
-			if (QSysInfo::WindowsVersion == QSysInfo::WV_32s){
-				ua += "Windows 3.1";
-			}else if (QSysInfo::WindowsVersion == QSysInfo::WV_95){
-				ua += "Windows 95";
-			}else if (QSysInfo::WindowsVersion == QSysInfo::WV_98){
-				ua += "Windows 98";
-			}else if (QSysInfo::WindowsVersion == QSysInfo::WV_Me){
-				ua += "Windows ME";
-			}else {
-				ua += "Windows Unknown";
-			}
-		}else if (QSysInfo::WindowsVersion & QSysInfo::WV_NT_based){
-			ua += "WinNT; ";
-			if (QSysInfo::WindowsVersion == QSysInfo::WV_NT){
-				ua += "Windows NT";
-			}else if (QSysInfo::WindowsVersion == QSysInfo::WV_2000){
-				ua += "Windows 2000";
-			}else if (QSysInfo::WindowsVersion == QSysInfo::WV_XP){
-				ua += "Windows XP";
-			}else if (QSysInfo::WindowsVersion == QSysInfo::WV_2003){
-				ua += "Windows Server 2003";
-			}else if (QSysInfo::WindowsVersion == QSysInfo::WV_VISTA){
-				ua += "Windows Vista";
-			}else if (QSysInfo::WindowsVersion == QSysInfo::WV_WINDOWS7){
-				ua += "Windows 7";
-            }else if (QSysInfo::WindowsVersion == QSysInfo::WV_WINDOWS8){
-                ua += "Windows 8";
-            }else if (QSysInfo::WindowsVersion == QSysInfo::WV_WINDOWS10){
-                ua += "Windows 10";
-			}else{
-				ua += "Windows Unknown";
-			}
-
-		}else if (QSysInfo::WindowsVersion & QSysInfo::WV_CE_based){
-			if (QSysInfo::WindowsVersion == QSysInfo::WV_CE){
-				ua += "Windows CE";
-			}else if (QSysInfo::WindowsVersion == QSysInfo::WV_CENET){
-				ua += "Windows CS .NET";
-			}else{
-				ua += "Windows Unknown";
-			}
-
-			ua += "WinCE; ";
-		}else{
-			ua += "WinUnknown";
-		}
-#elif Q_WS_MAC
-		if (QSysInfo::MacintoshVersion == QSysInfo::MV_9){
-            ua += "Mac OS 9";
-		}else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_0){
-            ua += "Mac OS X 10.0 Cheetah";
-		}else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_1){
-            ua += "Mac OS X 10.1 Puma";
-		}else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_2){
-            ua += "Mac OS X 10.2 Jaguar";
-		}else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_3){
-            ua += "Mac OS X 10.3 Panther";
-		}else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_4){
-            ua += "Mac OS X 10.4 Tiger";
-		}else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_5){
-            ua += "Mac OS X 10.5 Leopard";
-        }else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_6){
-            ua += "Mac OS X 10.6 Snow Leopard";
-        }else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_7){
-            ua += "Mac OS X 10.7 Lion";
-        }else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_8){
-            ua += "Mac OS X 10.8 Mountain Lion";
-        }else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_9){
-            ua += "Mac OS X 10.9 Mavericks";
-        }else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_10){
-            ua += "Mac OS X 10.10 Yosemite";
-        }else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_11){
-            ua += "Mac OS X 10.11 El Capitan";
-        }else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_12){
-            ua += "macOS 10.12 Sierra";
-		}else{
-			ua += "Mac Unknown";
-		}
-#else
-		ua += "Linux ";
-		QFile kernel("/proc/sys/kernel/osrelease");
-		if (kernel.exists() && kernel.open(QIODevice::ReadOnly)){
-			QString lkv = kernel.readLine();
-			ua += lkv.section("\n", 0, 0);
-		}else{
-			ua += "Unknown";
-		}
-
-        // Find out what Linux distro the user is using.
-
-        bool lsbError = false;
-        QString* distro;
-        QProcess lsb;
-        lsb.start("/usr/bin/lsb_release", QStringList() << "-d");
-        connect(&lsb, static_cast<void(QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
-                [&](int exitCode, QProcess::ExitStatus exitStatus){
-            if (exitCode == 0 && exitStatus == QProcess::NormalExit) {
-                QByteArray lsbout = lsb.readAllStandardOutput();
-                lsbout.remove(0, QString("Description: ").length());
-                lsbout.chop(1); // Remove newline
-                distro = new QString(lsbout);
-            } else {
-                lsbError = true;
-            }
-        });
-        connect(&lsb, static_cast<void(QProcess::*)(QProcess::ProcessError)>(&QProcess::error),
-            [&](QProcess::ProcessError error){
-            lsbError = true;
-        });
-        lsb.waitForFinished(-1);
-
-        ua += " ";
-        if (lsbError) {
-            ua += "Unknown";
-        } else {
-            ua += distro;
-            delete distro;
-        }
-#endif
-
-#if defined(USE_UID)
-		LOGDATAO() << "UID: " << ZDL_UID << endl;
-		ua += "; UID:";
-		ua += ZDL_UID;
-#endif
-		ua += ")";
-		LOGDATAO() << "User-Agent: " << ua << endl;
-		//cout << "User agent:" << ua.toStdString() << endl;
-        //qreq.setValue("Host", this->host);
-        http->setHeader(QNetworkRequest::UserAgentHeader, ua);
+		http->setHeader(QNetworkRequest::UserAgentHeader, ua);
         reply = net.get(*http);
         LOGDATAO() << "Request started" << endl;
         connect(reply, SIGNAL(readyRead()), this, SLOT(readyRead()));
         connect(reply, SIGNAL(finished()), this, SLOT(httpRequestFinished()));
-    }else{
+    } else {
 		LOGDATAO() << "Can't start multiple requests" << endl;
 	}
+}
 
+QString ZDLUpdater::getUserAgent(){
+	// Construct UA string
+	QString ua = QString(ZDL_ENGINE_NAME) + QString(" ") + versionString;
+	ua += " (";
+#ifdef Q_WS_WIN
+	if (QSysInfo::WindowsVersion & QSysInfo::WV_DOS_based){
+		ua += "Win32; ";
+		if (QSysInfo::WindowsVersion == QSysInfo::WV_32s){
+			ua += "Windows 3.1";
+		}else if (QSysInfo::WindowsVersion == QSysInfo::WV_95){
+			ua += "Windows 95";
+		}else if (QSysInfo::WindowsVersion == QSysInfo::WV_98){
+			ua += "Windows 98";
+		}else if (QSysInfo::WindowsVersion == QSysInfo::WV_Me){
+			ua += "Windows ME";
+		}else {
+			ua += "Windows Unknown";
+		}
+	}else if (QSysInfo::WindowsVersion & QSysInfo::WV_NT_based){
+		ua += "WinNT; ";
+		if (QSysInfo::WindowsVersion == QSysInfo::WV_NT){
+			ua += "Windows NT";
+		}else if (QSysInfo::WindowsVersion == QSysInfo::WV_2000){
+			ua += "Windows 2000";
+		}else if (QSysInfo::WindowsVersion == QSysInfo::WV_XP){
+			ua += "Windows XP";
+		}else if (QSysInfo::WindowsVersion == QSysInfo::WV_2003){
+			ua += "Windows Server 2003";
+		}else if (QSysInfo::WindowsVersion == QSysInfo::WV_VISTA){
+			ua += "Windows Vista";
+		}else if (QSysInfo::WindowsVersion == QSysInfo::WV_WINDOWS7){
+			ua += "Windows 7";
+        }else if (QSysInfo::WindowsVersion == QSysInfo::WV_WINDOWS8){
+            ua += "Windows 8";
+        }else if (QSysInfo::WindowsVersion == QSysInfo::WV_WINDOWS10){
+            ua += "Windows 10";
+		}else{
+			ua += "Windows Unknown";
+		}
+
+	}else if (QSysInfo::WindowsVersion & QSysInfo::WV_CE_based){
+		if (QSysInfo::WindowsVersion == QSysInfo::WV_CE){
+			ua += "Windows CE";
+		}else if (QSysInfo::WindowsVersion == QSysInfo::WV_CENET){
+			ua += "Windows CS .NET";
+		}else{
+			ua += "Windows Unknown";
+		}
+
+		ua += "WinCE; ";
+	}else{
+		ua += "WinUnknown";
+	}
+#elif Q_WS_MAC
+	if (QSysInfo::MacintoshVersion == QSysInfo::MV_9){
+        ua += "Mac OS 9";
+	}else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_0){
+        ua += "Mac OS X 10.0 Cheetah";
+	}else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_1){
+        ua += "Mac OS X 10.1 Puma";
+	}else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_2){
+        ua += "Mac OS X 10.2 Jaguar";
+	}else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_3){
+        ua += "Mac OS X 10.3 Panther";
+	}else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_4){
+        ua += "Mac OS X 10.4 Tiger";
+	}else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_5){
+        ua += "Mac OS X 10.5 Leopard";
+    }else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_6){
+        ua += "Mac OS X 10.6 Snow Leopard";
+    }else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_7){
+        ua += "Mac OS X 10.7 Lion";
+    }else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_8){
+        ua += "Mac OS X 10.8 Mountain Lion";
+    }else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_9){
+        ua += "Mac OS X 10.9 Mavericks";
+    }else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_10){
+        ua += "Mac OS X 10.10 Yosemite";
+    }else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_11){
+        ua += "Mac OS X 10.11 El Capitan";
+    }else if (QSysInfo::MacintoshVersion == QSysInfo::MV_10_12){
+        ua += "macOS 10.12 Sierra";
+	}else{
+		ua += "Mac Unknown";
+	}
+#else
+	ua += "Linux ";
+	QFile kernel("/proc/sys/kernel/osrelease");
+	if (kernel.exists() && kernel.open(QIODevice::ReadOnly)){
+		QString lkv = kernel.readLine();
+		ua += lkv.section("\n", 0, 0);
+	}else{
+		ua += "Unknown";
+	}
+
+    // Find out what Linux distro the user is using.
+
+    bool lsbError = false;
+    QString* distro;
+    QProcess lsb;
+    lsb.start("/usr/bin/lsb_release", QStringList() << "-d");
+    connect(&lsb, static_cast<void(QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
+            [&](int exitCode, QProcess::ExitStatus exitStatus){
+        if (exitCode == 0 && exitStatus == QProcess::NormalExit) {
+            QByteArray lsbout = lsb.readAllStandardOutput();
+            lsbout.remove(0, QString("Description: ").length());
+            lsbout.chop(1); // Remove newline
+            distro = new QString(lsbout);
+        } else {
+            lsbError = true;
+        }
+    });
+    connect(&lsb, static_cast<void(QProcess::*)(QProcess::ProcessError)>(&QProcess::error),
+        [&](QProcess::ProcessError error){
+        lsbError = true;
+    });
+    lsb.waitForFinished(-1);
+
+    ua += " ";
+    if (lsbError) {
+        ua += "Unknown";
+    } else {
+        ua += distro;
+        delete distro;
+    }
+#endif
+
+#if defined(USE_UID)
+	LOGDATAO() << "UID: " << ZDL_UID << endl;
+	ua += "; UID:";
+	ua += ZDL_UID;
+#endif
+	ua += ")";
+	return ua;
 }
 
 void ZDLUpdater::httpRequestFinished(){
